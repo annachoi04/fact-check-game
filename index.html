@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>메타의 지령: 페이크를 물리쳐라</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/quiple/galmuri@latest/dist/galmuri.css">
+<style>
+  :root{
+    --gold:#f4c94b;
+    --gold-soft:#fbe5a0;
+    --devil-red:#e4453a;
+    --devil-dark:#2a0f12;
+    --angel-blue:#8ecbff;
+    --bg-deep:#0a0a0a;
+    --card-bg:#161616;
+    --text-light:#f4f1ff;
+    --text-dim:#b9aed4;
+    --ink:#000000;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background: radial-gradient(circle at 30% 20%, #161616 0%, #0a0a0a 55%, #000000 100%);
+    font-family:"Galmuri11","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    color:var(--text-light);
+    image-rendering:pixelated;
+  }
+  .scene{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+
+  /* 픽셀 패널 공용 유틸 (하드엣지 테두리 + 오프셋 그림자) */
+  .pixel-panel{
+    border-radius:0;
+    border:3px solid var(--ink);
+    box-shadow: 0 0 0 2px var(--gold), 4px 4px 0 rgba(0,0,0,0.55);
+  }
+  .pixel-panel-blue{
+    border-radius:0;
+    border:3px solid var(--ink);
+    box-shadow: 0 0 0 2px var(--angel-blue), 4px 4px 0 rgba(0,0,0,0.55);
+  }
+  /* 참고 이미지 스타일의 도트 테두리 상태창 패널 */
+  .pixel-panel-dotted{
+    border-radius:8px;
+    border:3px dotted var(--gold);
+    background:var(--card-bg);
+    box-shadow: 0 4px 0 rgba(0,0,0,0.4);
+  }
+
+  /* 가로형 데스크탑 게임 창 */
+  .game-window{
+    width:960px; max-width:96vw; height:600px; background:var(--ink); padding:14px;
+    box-shadow: 0 0 0 3px #2a2a2a, 0 0 0 6px var(--ink), 0 30px 60px -15px rgba(0,0,0,0.7);
+    position:relative;
+  }
+  .game-inner{ background:linear-gradient(180deg,#161616 0%, #101010 100%); height:100%; display:flex; flex-direction:column; overflow:hidden; position:relative; border:2px solid #2a2a2a; }
+  .game-inner::after{
+    content:''; position:absolute; inset:0; pointer-events:none; z-index:20; opacity:0.08;
+    background:repeating-linear-gradient(0deg, #000 0px, #000 1px, transparent 1px, transparent 3px);
+  }
+  .hud-bar{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin:14px 18px 0; padding:8px 18px; position:relative; z-index:21; }
+  .hud-title{ flex:1; text-align:center; font-size:11px; letter-spacing:1.5px; color:var(--gold-soft); font-family:"Galmuri9",monospace; }
+  .chapter-tag{ font-size:9.5px; letter-spacing:1px; color:var(--gold-soft); text-transform:uppercase; font-family:"Galmuri9",monospace; white-space:nowrap; }
+  .hearts-row{ display:flex; gap:4px; font-size:15px; white-space:nowrap; }
+  .hearts-row span.heart-full{ color:var(--devil-red); }
+  .hearts-row span.heart-empty{ color:#3a3a3a; }
+  .hearts-row.pulse{ animation:heartPulse .4s; }
+  @keyframes heartPulse{ 0%,100%{transform:scale(1);} 40%{transform:scale(1.3);} }
+  .crisis-flash{ animation:crisisFlash .5s; }
+  @keyframes crisisFlash{ 0%,100%{ box-shadow:none; } 30%{ box-shadow: inset 0 0 40px 10px rgba(228,69,58,0.7); } }
+
+  .screen{ flex:1; padding:16px 28px 24px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; position:relative; }
+  .screen::-webkit-scrollbar{width:4px;}
+  .screen::-webkit-scrollbar-thumb{background:#3a2f55;}
+  .screen:not(.mode-world){ align-items:center; }
+  .screen:not(.mode-world) > *{ max-width:640px; width:100%; }
+
+  /* ---- 월드(대사/스토리) 모드 ---- */
+  .screen.mode-world{ padding:0; gap:0; overflow:hidden; }
+  .world-bg{ position:absolute; inset:0; z-index:0; transition:background .4s; image-rendering:pixelated; }
+  .world-bg::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(10,6,20,0.9) 100%); }
+  .portrait-wrap{ position:relative; z-index:1; flex:1; display:flex; align-items:flex-end; justify-content:center; min-height:0; padding-bottom:6px; }
+  .portrait-img{ max-height:320px; max-width:42%; image-rendering:pixelated; filter:drop-shadow(0 10px 10px rgba(0,0,0,0.6)); }
+  .dialogue-box{ position:relative; z-index:1; margin:0 32px 22px; background:#101010; padding:16px 22px 14px; cursor:pointer; }
+  .dialogue-box.narration-box{ background:rgba(21,15,38,0.85); font-style:italic; text-align:center; }
+  .speaker-name{ font-size:12.5px; font-weight:700; margin-bottom:5px; font-family:"Galmuri11",sans-serif; }
+  .dialogue-text{ font-size:12.5px; line-height:1.75; color:var(--text-light); min-height:40px; }
+  .advance-hint{ text-align:right; font-size:10px; color:var(--gold-soft); margin-top:6px; font-family:"Galmuri9",monospace; }
+  .chapter-card{ position:relative; z-index:1; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px; padding:20px; cursor:pointer; }
+  .chapter-card-inner{ padding:22px 18px; background:rgba(13,7,22,0.72); }
+  .chapter-card-title{ font-size:11px; letter-spacing:3px; color:var(--gold-soft); text-transform:uppercase; font-family:"Galmuri9",monospace; }
+  .chapter-card-sub{ font-size:19px; font-weight:700; color:var(--text-light); margin-top:8px; }
+  .choice-list{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+  .story-choice-btn{ background:#1a1a1a; color:var(--text-light); padding:11px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:"Galmuri11",sans-serif; }
+  .story-choice-btn:hover{ background:#262626; }
+  .title-card{ position:relative; z-index:1; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:24px; text-align:center; }
+  .title-heading{ font-size:24px; font-weight:700; color:var(--gold); text-shadow:2px 2px 0 rgba(0,0,0,0.6); letter-spacing:1px; }
+  .title-sub{ font-size:10.5px; color:var(--text-dim); font-family:"Galmuri9",monospace; }
+  .credit-line{ font-size:9.5px; color:var(--text-dim); font-family:"Galmuri9",monospace; text-align:center; margin-top:18px; opacity:0.7; }
+  .name-input{ width:80%; padding:10px 12px; border-radius:0; border:3px solid var(--ink); box-shadow:0 0 0 2px var(--gold-soft); background:#101010; color:var(--text-light); font-size:12.5px; text-align:center; font-family:"Galmuri11",sans-serif; }
+  .name-input:focus{ outline:none; }
+
+  /* ---- 버튼 공통 (픽셀 베벨) ---- */
+  .btn{ border:none; border-radius:0; padding:13px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:"Galmuri11",sans-serif; transition:transform .05s; }
+  .btn-primary{ background:var(--gold); color:#231404; box-shadow: -2px 0 0 #8a6a1a inset, 0 -2px 0 #8a6a1a inset, 4px 4px 0 rgba(0,0,0,0.6); }
+  .btn-primary:active{ transform:translate(3px,3px); box-shadow:none; }
+  .btn-ghost{ background:#1a1a1a; color:var(--text-light); box-shadow: -2px 0 0 #000000 inset, 0 -2px 0 #000000 inset, 4px 4px 0 rgba(0,0,0,0.6); }
+  .btn-ghost:active{ transform:translate(3px,3px); box-shadow:none; }
+
+  /* ---- 미니게임(폰 클로즈업) 모드 ---- */
+  .stage-header{ display:flex; justify-content:space-between; align-items:baseline; font-size:11px; color:var(--angel-blue); font-weight:700; letter-spacing:0.5px; font-family:"Galmuri9",monospace; }
+
+  /* 페이크의 대사(문제 지시문) / 아리엘의 대사(피드백) 스피치 박스 */
+  .speech-box{ display:flex; gap:10px; align-items:flex-start; border:2px solid; padding:11px 13px; font-size:12px; line-height:1.65; background:#161616; }
+  .speech-box.fake{ border-color:var(--devil-red); }
+  .speech-box.ariel{ border-color:var(--angel-blue); }
+  .speaker-chip{ flex:0 0 auto; font-size:10px; font-weight:700; letter-spacing:0.5px; padding:3px 8px; font-family:"Galmuri9",monospace; white-space:nowrap; }
+  .speaker-chip.fake{ background:var(--devil-red); color:#2a0f12; }
+  .speaker-chip.ariel{ background:var(--angel-blue); color:#000; }
+  .speech-text{ color:var(--text-light); }
+
+  /* 홈페이지(브라우저) 크롬 — 기사 미니게임을 실제 웹페이지처럼 보이게 */
+  .browser-frame{ background:#0d0d0d; border:1px solid #2a2a2a; box-shadow:4px 4px 0 rgba(0,0,0,0.5); }
+  .browser-bar{ display:flex; align-items:center; gap:6px; padding:7px 10px; background:#1c1c1c; border-bottom:1px solid #2a2a2a; }
+  .browser-dot{ width:8px; height:8px; border-radius:50%; }
+  .browser-dot.red{background:#ff5f57;} .browser-dot.yellow{background:#febc2e;} .browser-dot.green{background:#28c840;}
+  .browser-url{ flex:1; margin-left:8px; background:#000; color:#777; font-size:9.5px; padding:4px 10px; font-family:"Galmuri9",monospace; }
+  .site-masthead{ background:#fff; color:#111; padding:12px 16px 9px; border-bottom:3px solid #111; display:flex; justify-content:space-between; align-items:baseline; }
+  .site-logo{ font-weight:900; font-size:14px; letter-spacing:-0.5px; }
+  .site-nav{ font-size:9.5px; color:#999; display:flex; gap:9px; font-family:"Galmuri9",monospace; }
+  .article-app{ background:#fff; color:#111; padding:14px 16px 16px; }
+  .article-app .src{ font-size:10px; color:#999; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:4px; font-family:"Galmuri9",monospace; }
+  .article-app .headline{ font-size:13.5px; font-weight:700; margin:0 0 8px; line-height:1.4; }
+  .article-app p.body{ font-size:12px; line-height:1.8; margin:0; color:#333; }
+  .site-footer{ background:#f0f0f0; color:#999; font-size:9px; padding:7px 16px; border-top:1px solid #ddd; font-family:"Galmuri9",monospace; }
+  mark.highlight{ background:linear-gradient(90deg, rgba(244,201,75,0.6), rgba(244,201,75,0.4)); padding:1px 3px; color:#111; font-weight:700; }
+  .blank-slot{ display:inline-block; min-width:60px; border:2px dashed #d34a3f; padding:2px 10px; color:#d34a3f; font-weight:700; font-size:11px; background:#fff3f1; }
+  .blank-slot.filled{ border:2px solid #2e9e6f; color:#1c6b48; background:#eafff4; }
+  .clickable-phrase{ cursor:pointer; border-bottom:2px solid rgba(211,74,63,0.6); transition:background .15s; }
+  .clickable-phrase:hover{background:rgba(211,74,63,0.14);}
+  .clickable-phrase.corrected{ border-bottom:none; background:rgba(46,158,111,0.15); color:#1c6b48; font-weight:700; cursor:default; }
+  .choice-row{display:flex; gap:10px;}
+  .choice-btn{ flex:1; border:none; background:#1a1a1a; color:var(--text-light); box-shadow:-2px 0 0 var(--ink) inset, 0 -2px 0 var(--ink) inset, 3px 3px 0 rgba(0,0,0,0.5); padding:13px 8px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:"Galmuri11",sans-serif; }
+  .choice-btn:hover{background:#262626;}
+  .choice-btn.correct{background:#1e5c43; box-shadow:-2px 0 0 #0d3324 inset, 0 -2px 0 #0d3324 inset, 3px 3px 0 rgba(0,0,0,0.5); color:#d3ffe8;}
+  .choice-btn.wrong{background:#6e2620; box-shadow:-2px 0 0 #3a120e inset, 0 -2px 0 #3a120e inset, 3px 3px 0 rgba(0,0,0,0.5); color:#ffc9c4;}
+  .choice-btn:disabled{cursor:default;}
+  .prompt-note{ font-size:10.5px; color:var(--text-dim); margin:2px 0 8px; }
+  .msoptions{display:flex; flex-direction:column; gap:7px;}
+  .msoption{ display:flex; align-items:flex-start; gap:8px; background:#1a1a1a; border:2px solid #2a2a2a; padding:9px 10px; font-size:11.5px; line-height:1.5; color:var(--text-light); cursor:pointer; }
+  .msoption:hover{border-color:var(--angel-blue);}
+  .msoption.picked{ border-color:var(--gold); background:#3a2c14; }
+  .msoption .box{ flex:0 0 auto; width:16px; height:16px; border:2px solid var(--text-dim); margin-top:1px; display:flex; align-items:center; justify-content:center; font-size:11px; }
+  .msoption.picked .box{ border-color:var(--gold); color:var(--gold); }
+  .candidates{display:flex; flex-direction:column; gap:8px;}
+  .candidate{ background:#1a1a1a; border:2px solid #2a2a2a; padding:10px 12px; font-size:11.5px; line-height:1.5; color:var(--text-light); cursor:grab; }
+  .candidate:hover{border-color:var(--angel-blue);}
+  .candidate.wrong-flash{border-color:var(--devil-red); background:#4a1f1c;}
+  .candidate.used{opacity:0.35; cursor:default;}
+  .feedback{ font-size:11.5px; line-height:1.6; padding:12px 14px; display:none; border:2px solid; gap:10px; align-items:flex-start; }
+  .feedback.show{display:flex;}
+  .feedback.ok{background:rgba(78,196,140,0.15); border-color:#4ec48c; color:#d3ffe8;}
+  .feedback.bad{background:rgba(228,69,58,0.15); border-color:var(--devil-red); color:#ffd8d4;}
+  textarea.answer-input{ width:100%; min-height:70px; border-radius:0; border:2px solid #2a2a2a; background:#101010; color:var(--text-light); padding:10px 12px; font-size:12.5px; font-family:"Galmuri11",sans-serif; resize:none; }
+  textarea.answer-input:focus{outline:none; border-color:var(--gold);}
+  .tip-box{ background:rgba(142,203,255,0.08); border:2px solid var(--angel-blue); padding:12px 14px; font-size:11px; line-height:1.7; color:var(--text-light); }
+  .tip-box b{color:var(--angel-blue);}
+  .score-badge{ text-align:center; font-size:24px; font-weight:700; color:var(--gold); font-family:"Galmuri14",sans-serif; }
+  .score-sub{text-align:center; font-size:11px; color:var(--text-dim);}
+  .intro-title{ font-size:18px; font-weight:700; text-align:center; color:var(--gold); text-shadow:2px 2px 0 rgba(0,0,0,0.6); line-height:1.5; }
+  .footer-nav{margin-top:auto; display:flex; flex-direction:column; gap:8px;}
+
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
+  .shake{animation:shake .35s;}
+
+  @media (max-width:1000px){ .game-window{ width:100%; height:82vh; padding:8px; } .dialogue-box{ margin:0 16px 16px; } .portrait-img{ max-width:55%; max-height:220px; } }
+</style>
+</head>
+<body>
+
+<div class="scene">
+  <div class="game-window">
+    <div class="game-inner">
+      <div class="hud-bar pixel-panel-dotted">
+        <div id="tagSlot"></div>
+        <div class="hud-title">메타의 지령: 페이크를 물리쳐라</div>
+        <div id="heartsSlot"></div>
+      </div>
+      <div class="screen" id="screen"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   에셋 가이드
+   - 배경: LOCATIONS 값에 assets/bg_*.jpg 를 사용합니다 (직접 그려주신 이미지).
+   - 캐릭터: CAST.*.img()가 상황(날개 개수·구출 여부·감정)에 따라
+     assets/*.png 경로를 반환합니다. 새 포즈를 추가하려면 이 함수만 손보면 됩니다.
+   ============================================================ */
+
+/* ---------------- 캐스트 & 배경 ---------------- */
+const CAST = {
+  player:   { name:null, color:'#f4c94b', img:()=>null },
+  ariel:    {
+    name:'아리엘', color:'#8ecbff',
+    img:(emotion)=>{
+      if(emotion==='divine') return 'assets/ariel_final.png';
+      if(state.wings===0) return emotion==='downed' ? 'assets/ariel_wingless_downed.png' : 'assets/ariel_wingless_standing.png';
+      if(state.wings===1) return 'assets/ariel_onewing_standing.png';
+      if(emotion==='smiling') return 'assets/ariel_fullwings_smiling.png';
+      if(emotion==='power') return 'assets/ariel_fullwings_power.png';
+      return 'assets/ariel_fullwings_standing.png';
+    }
+  },
+  fake:     { name:'페이크', color:'#e4453a', img:(emotion)=> emotion==='defeated' ? 'assets/fake_defeated.png' : 'assets/fake.png' },
+  kyle:     { name:'카일', color:'#ffa552', img:()=> state.kyleFreed ? 'assets/blogger_recovered.png' : 'assets/blogger_enthralled.png' },
+  daeun:    { name:'다은', color:'#6fd8c5', img:()=> state.daeunFreed ? 'assets/reporter_recovered.png' : 'assets/reporter_enthralled.png' },
+  narration:{ name:'', color:'#b9aed4', img:()=>null }
+};
+
+const LOCATIONS = {
+  meca:  "url('assets/bg_meca_city.png') center 60%/cover no-repeat",
+  alley: "url('assets/bg_alley.jpg') center/cover no-repeat",
+  busan: "url('assets/bg_day_street.jpg') center/cover no-repeat",
+  seoul: "url('assets/bg_river.jpg') center/cover no-repeat",
+  final: "url('assets/bg_matrix.jpg') center/cover no-repeat"
+};
+
+/* ---------------- 미니게임 데이터 ---------------- */
+const factDataBlaze = {
+  before: "",
+  highlight: "블레이즈문의 'Gravity'는 발매 후 빌보드 핫100에 21위로 진입해 24주 연속 차트에 머물렀으며, 이는 북미 시장을 완전히 손에 넣었다는 것을 보여준다.",
+  after: "",
+  answer: "claim",
+  explain: "여기서 정답은 <b>주장 및 해석</b>이야. '21위 진입, 24주 연속 차트인'까지는 확인 가능한 사실인데, '북미 시장을 완전히 손에 넣었다'는 그 수치만으론 설명이 안 되는 과한 해석이거든."
+};
+const factDataBlaze2 = {
+  before: "",
+  highlight: "블레이즈문의 'Gravity'는 발매 3주 만에 라디오 에어플레이 횟수가 동시기 데뷔한 경쟁 그룹들보다 두 배 이상 높았다.",
+  after: "",
+  answer: "claim",
+  explain: "정답은 <b>주장 및 해석</b>이야. '두 배 이상'이라는 숫자는 있지만, 비교 대상인 '경쟁 그룹'이 정확히 누구인지, 어디서 집계했는지가 안 나와 있어. 숫자가 있어도 비교 기준이랑 출처가 없으면 검증할 수 없는 주장이 되는 거야."
+};
+const factData3 = {
+  before: "",
+  highlight: "제니스의 신곡이 발매 당일 자체 팬 플랫폼 앱 다운로드 수 50만 건을 기록했다고 소속사가 밝혔다.",
+  after: " 이를 두고 한 매체는 K-팝 역사상 유례없는 대기록이라 평가했다.",
+  answer: "fact",
+  explain: "이건 <b>사실</b>이야. '~라고 소속사가 밝혔다'처럼 출처랑 구체적인 수치가 같이 나오면, 그 의미를 부풀리지 않고 그대로 전달한 이상 사실 진술로 볼 수 있어."
+};
+const factData3b = {
+  before: "",
+  highlight: "제니스는 최근 3개월간 발매한 모든 음원이 국내 음원차트 상위 10위 안에 들었다고 소속사가 공식 보도자료를 통해 밝혔다.",
+  after: "",
+  answer: "fact",
+  explain: "이것도 <b>사실</b>이야. 기간(3개월)·순위(상위 10위)·출처(공식 보도자료)가 다 구체적으로 나와 있어서 검증할 수 있거든. 성과의 의미를 부풀리는 해석이 안 붙은, 순수한 진술이라는 것도 기억해둬."
+};
+const factData3c = {
+  before: "",
+  highlight: "제니스의 신곡은 국내 주요 음원차트 4개 중 3개에서 발매 당일 1위를 기록했다.",
+  after: "",
+  answer: "fact",
+  explain: "정답은 <b>사실</b>이야. 차트 개수·순위·시점이 다 구체적으로 나와 있고, 따로 해석이나 평가가 붙어있지 않잖아."
+};
+
+const factDataBlaze3 = {
+  before: "",
+  highlight: "블레이즈문은 데뷔 후 첫 주 빌보드 200에 4위로 진입했으며, 이는 신인 그룹으로서는 전례가 없는 성과다.",
+  after: "",
+  answer: "claim",
+  explain: "정답은 <b>주장 및 해석</b>이야. '빌보드 200 4위 진입'까지는 사실인데, '전례가 없는 성과'는 어떤 신인 그룹들이랑 비교했는지가 안 나와 있어서 검증할 수 없는 평가야."
+};
+
+const evidenceData2 = {
+  headline: "블레이즈문의 'Gravity'가 미국 대중 사이에서 꾸준히 확산되고 있다.",
+  candidates: [
+    "같은 앨범 수록곡 'Nightfall'은 빌보드 핫100에 96위로 진입했다가 이후 대부분 차트 밖으로 밀려났다.",
+    "블레이즈문은 데뷔 후 첫 주 빌보드 200에 4위로 진입한 바 있다.",
+    "블레이즈문의 'Gravity'는 빌보드 핫100에 21위로 진입한 뒤 24주 연속 차트에 머물며 장기 흥행세를 보였다.",
+    "블레이즈문의 'Gravity'는 발매 첫날 스트리밍 500만 회를 기록했다."
+  ],
+  correct: 2,
+  explain: "정답은 24주간 차트에 머물렀다는, '꾸준한 확산'을 직접 보여주는 지속성 데이터야. 발매 첫날 스트리밍 수치도 인상적이긴 한데, 그건 '하루치' 순간 기록일 뿐이라 꾸준함까진 증명하지 못하거든."
+};
+const evidenceData2b = {
+  headline: "블레이즈문의 'Gravity'가 미국 라디오에서도 활발히 방영되고 있다.",
+  candidates: [
+    "'Gravity'는 발매 3주 차에 미국 주요 라디오 방송국 에어플레이 차트 32위에 올랐다.",
+    "블레이즈문의 소속사는 라디오 프로모션에 대규모 예산을 투입했다고 밝혔다.",
+    "블레이즈문 팬들은 자발적으로 라디오 방송국에 신청곡 요청 캠페인을 벌였다.",
+    "블레이즈문의 소속사는 내년 라디오 프로모션을 더 확대할 계획이라고 밝혔다."
+  ],
+  correct: 0,
+  explain: "정답은 실제 라디오 에어플레이 차트 순위, 그러니까 직접적인 지표야. 프로모션 예산을 썼다거나 팬들이 신청 캠페인을 벌였다거나 향후 계획 같은 건, '지금 활발히 방영되고 있다'는 결과를 직접 보여주진 못하는 정황일 뿐이야."
+};
+
+const evidenceData3 = {
+  headline: "제니스의 신곡이 발매 직후 팬덤을 넘어 대중적으로 확산되고 있다.",
+  candidates: [
+    "제니스의 신곡은 발매 당일 팬 커뮤니티 앱에서 실시간 인기글 1위에 올랐다.",
+    "제니스의 신곡은 발매 이후 팬덤 전용 채널이 아닌 대중 음원 서비스의 '급상승 차트'에서 3일 연속 1위를 유지했다.",
+    "제니스의 신곡은 실시간 차트 진입 당일 오후 한때 1위에 오른 적이 있다.",
+    "제니스의 신곡 뮤직비디오는 유튜브 조회수 1억 회를 돌파했다."
+  ],
+  correct: 1,
+  explain: "정답은 팬덤 전용 공간이 아니라 일반 대중 음원 서비스 차트에서 3일간 유지된 성과야. 유튜브 조회수는 숫자는 크지만 같은 팬이 반복 재생한 걸 수도 있어서, '팬덤을 넘어섰다'는 근거로 삼기엔 약해."
+};
+const evidenceData3b = {
+  headline: "제니스의 신곡이 해외에서도 주목받고 있다.",
+  candidates: [
+    "제니스의 신곡은 해외 케이팝 팬 커뮤니티 게시판에서 조회수 상위권에 올랐다.",
+    "제니스의 신곡은 3개국 아이튠즈 케이팝 차트에서 1위를 기록했다.",
+    "제니스 소속사는 해외 진출을 위한 협업을 계획 중이라고 밝혔다.",
+    "제니스의 팬클럽은 해외 팬들을 위한 자막 번역 봉사단을 자체적으로 운영하고 있다."
+  ],
+  correct: 1,
+  explain: "정답은 실제 해외 공식 차트 순위 데이터야. 팬 커뮤니티 조회수나 팬클럽의 자발적인 활동은 어디까지나 팬덤 내부 지표고, 협업 계획 발표는 아직 실현되지 않은 일이라 지금 '주목받고 있다'는 걸 증명하진 못해."
+};
+
+const exaggerateData2 = {
+  spans: [
+    {text:"제니스의 신곡 'Gravity'는 발매 후 ", clickable:false},
+    {text:"빌보드 핫100에 21위로 진입해 24주 연속 차트에 머물렀고", clickable:true, correct:false},
+    {text:", ", clickable:false},
+    {text:"국내 음원차트에서도 상위권을 유지했으며", clickable:true, correct:false},
+    {text:", ", clickable:false},
+    {text:"이는 일시적 화제를 넘어 지속적인 대중적 소비가 있었음을 보여주는 성과다", clickable:true, correct:false},
+    {text:". 이를 근거로 한 매체는 ", clickable:false},
+    {text:"제니스가 글로벌 팝 아이콘으로 등극했다", clickable:true, correct:true},
+    {text:"고 보도했다.", clickable:false}
+  ],
+  corrected: "제니스가 빌보드 핫100에서 24주간 순위를 유지하고 국내 음원차트에서도 상위권을 지키며 의미 있는 확산세를 보였지만, 라디오 방영이나 공연 규모 등 추가 지표 없이 '글로벌 아이콘'이라 단정하기는 이르다.",
+  explain: "'글로벌 팝 아이콘으로 등극했다'는 표현, 차트 순위 하나만 가지고 라디오 영향력이나 공연 규모, 비평적 평가까지 다 아우르는 지위를 단정해버린 과장이야. 나머지 세 표현은 다 구체적인 차트 데이터로 뒷받침되고 있어서 괜찮고.",
+  wrongHint: "그 표현은 실제 차트 데이터가 뒷받침하는 범위 안에 있는 거야. 차트 순위만으로는 증명 안 되는, 더 큰 지위를 단정해버린 표현을 찾아봐."
+};
+const exaggerateData2b = {
+  spans: [
+    {text:"제니스는 올해 한 음악 시상식에서 ", clickable:false},
+    {text:"신인상을 수상했고", clickable:true, correct:false},
+    {text:", ", clickable:false},
+    {text:"같은 시상식 인기상 투표에서도 상위 5위 안에 들었다", clickable:true, correct:false},
+    {text:". 이를 두고 한 매체는 ", clickable:false},
+    {text:"제니스가 명실상부 이 시대를 대표하는 아이콘으로 떠올랐다", clickable:true, correct:true},
+    {text:"고 평가했다.", clickable:false}
+  ],
+  corrected: "제니스가 신인상을 수상하고 인기상 투표에서도 상위권에 들며 주목할 만한 한 해를 보냈지만, 이를 '시대를 대표하는 아이콘'으로 부르기엔 활동 기간과 비교 대상이 더 필요하다.",
+  explain: "'시대를 대표하는 아이콘'은 시상식 하나에서의 성과만 가지고 훨씬 폭넓은 시대적 지위를 단정해버린 과장된 표현이야. 나머지 두 표현은 구체적인 수상·투표 결과로 뒷받침되니까 괜찮고.",
+  wrongHint: "그 표현은 실제 수상 내역이랑 투표 순위처럼 확인 가능한 데이터야. 시대 전체를 대표한다고 단정해버린 표현을 찾아봐."
+};
+const exaggerateData3 = {
+  spans: [
+    {text:"블레이즈문은 정규 2집 발매 이후 ", clickable:false},
+    {text:"빌보드 메인 앨범 차트에 3주 연속 이름을 올렸고", clickable:true, correct:false},
+    {text:", ", clickable:false},
+    {text:"라디오 에어플레이 순위에서도 상위권에 올랐으며", clickable:true, correct:false},
+    {text:", ", clickable:false},
+    {text:"팬들은 데뷔 이후 가장 뜨거운 반응을 보였다", clickable:true, correct:false},
+    {text:". 이 소식을 전하며 한 매체는 ", clickable:false},
+    {text:"블레이즈문이 북미 시장의 새로운 지배자로 등극했다", clickable:true, correct:true},
+    {text:"고 전했다.", clickable:false}
+  ],
+  corrected: "블레이즈문이 빌보드 메인 앨범 차트에 3주간 이름을 올리고 라디오 에어플레이에서도 상위권에 오르며 주목할 만한 성과를 냈지만, 이를 '시장 지배자'로 부르려면 투어 규모 등 추가적인 대중 지표가 필요하다.",
+  explain: "'시장의 새로운 지배자'는 앨범 차트랑 라디오 성과만으로 시장 전체를 장악했다고 단정해버린 과장된 표현이야. 나머지 세 표현은 구체적인 데이터나 팬덤이라는 명확한 범위 안에서 설명하고 있으니까 과장이 아니고.",
+  wrongHint: "그 표현은 실제 데이터(차트 순위·라디오 성과)나 팬덤이라는, 정확한 대상 범위 안에서 설명하고 있는 거야. 시장 전체를 장악했다고 단정해버린 표현을 찾아봐."
+};
+const exaggerateData3b = {
+  spans: [
+    {text:"블레이즈문은 첫 단독 투어 티켓을 ", clickable:false},
+    {text:"전 회차 매진시켰고", clickable:true, correct:false},
+    {text:", ", clickable:false},
+    {text:"3개 도시 공연장 규모를 데뷔 초보다 두 배로 늘렸다", clickable:true, correct:false},
+    {text:". 이를 두고 한 매체는 ", clickable:false},
+    {text:"블레이즈문이 이제 명실상부 세계 최고의 그룹이 되었다", clickable:true, correct:true},
+    {text:"고 보도했다.", clickable:false}
+  ],
+  corrected: "블레이즈문이 첫 단독 투어 전 회차를 매진시키고 공연장 규모까지 두 배로 늘렸지만, 이를 '세계 최고'로 부르기엔 다른 대륙에서의 성과 등 확인할 지표가 더 필요하다.",
+  explain: "'세계 최고의 그룹'은 투어 매진이라는 한정된 성과만 가지고 전 세계적인 지위를 단정해버린 과장된 표현이야. 나머지 두 표현은 매진 기록이랑 공연장 규모라는 구체적인 데이터로 뒷받침되고 있고.",
+  wrongHint: "그 표현은 실제 매진 기록이나 공연장 규모처럼 확인 가능한 데이터야. 세계 전체를 아우르는 단정적인 표현을 찾아봐."
+};
+
+const factDataStellar = {
+  before: "",
+  highlight: "스텔라나인의 유럽 투어는 5개 도시에서 모두 매진되었으며, 이는 K-팝 걸그룹 역사상 최다 매진 기록이다.",
+  after: "",
+  answer: "claim",
+  explain: "정답은 <b>주장 및 해석</b>이야. '5개 도시 매진'까진 사실인데, 'K-팝 걸그룹 역사상 최다'라는 비교는 다른 모든 K-팝 걸그룹의 기록을 다 확인해야 하는 건데 그 근거가 없잖아."
+};
+const factDataStellar2 = {
+  before: "",
+  highlight: "스텔라나인의 유럽 투어 티켓은 판매 개시 10분 만에 5개 도시 전석이 매진됐다고 주최 측이 공식 발표했다.",
+  after: "",
+  answer: "fact",
+  explain: "정답은 <b>사실</b>이야. 시간(10분)·도시 수·출처(주최 측 공식 발표)가 다 구체적으로 나와 있고, 따로 해석이나 평가가 붙어있지 않으니까."
+};
+const evidenceDataStellar = {
+  headline: "스텔라나인이 유럽 대중음악 시장에서도 인지도를 넓히고 있다.",
+  candidates: [
+    "스텔라나인의 유럽 투어 실황 영상은 팬 계정에서 높은 조회수를 기록했다.",
+    "스텔라나인의 신곡은 유럽 주요 3개국 공식 음원 차트에 처음으로 진입했다.",
+    "스텔라나인 소속사는 유럽 투어 규모를 내년에 확대할 계획이라고 밝혔다.",
+    "스텔라나인의 현지 팬 커뮤니티 가입자 수가 투어 이후 크게 늘었다."
+  ],
+  correct: 1,
+  explain: "정답은 팬덤 밖 공식 음원 차트 진입이라는 대중적인 지표야. 팬 계정 조회수나 팬 커뮤니티 가입자 수는 어디까지나 팬덤 내부 지표고, 향후 확대 계획은 아직 실현되지 않은 일이잖아."
+};
+const exaggerateDataStellar = {
+  spans: [
+    {text:"스텔라나인은 이번 유럽 투어에서 ", clickable:false},
+    {text:"5개 도시 전석을 매진시켰고", clickable:true, correct:false},
+    {text:", ", clickable:false},
+    {text:"일부 도시에서는 추가 공연까지 편성했다", clickable:true, correct:false},
+    {text:". 이를 두고 한 매체는 ", clickable:false},
+    {text:"스텔라나인이 유럽 전역을 완전히 정복했다", clickable:true, correct:true},
+    {text:"고 보도했다.", clickable:false}
+  ],
+  corrected: "스텔라나인이 5개 도시 전석 매진과 추가 공연 편성이라는 뚜렷한 성과를 냈지만, 이를 '유럽 전역을 정복했다'고 부르기엔 방문하지 않은 국가와 지역이 훨씬 많다는 점을 짚어야 한다.",
+  explain: "'유럽 전역을 정복했다'는 5개 도시라는 한정된 지역의 성과를 유럽 전체로 확대 해석해버린 과장된 표현이야. 나머지 두 표현은 매진 기록이랑 추가 공연 편성이라는 구체적인 데이터로 뒷받침되고 있고.",
+  wrongHint: "그 표현은 실제 매진 기록이랑 추가 공연 편성처럼 확인 가능한 데이터야. 유럽 전체를 아우르는 단정적인 표현을 찾아봐."
+};
+const exaggerateDataStellar2 = {
+  spans: [
+    {text:"스텔라나인은 이번 유럽 투어 기간 동안 ", clickable:false},
+    {text:"현지 방송사와 세 차례 인터뷰를 진행했고", clickable:true, correct:false},
+    {text:", ", clickable:false},
+    {text:"인터뷰 영상 조회수가 현지 SNS에서 200만 회를 넘겼다", clickable:true, correct:false},
+    {text:". 이를 두고 한 매체는 ", clickable:false},
+    {text:"스텔라나인이 유럽 대중문화의 새로운 표준이 되었다", clickable:true, correct:true},
+    {text:"고 평가했다.", clickable:false}
+  ],
+  corrected: "스텔라나인이 현지 방송 인터뷰와 SNS 조회수 200만 회라는 성과를 얻었지만, 이를 '유럽 대중문화의 새로운 표준'으로 부르기엔 실제 대중적 영향력을 보여줄 지표가 더 필요하다.",
+  explain: "'유럽 대중문화의 새로운 표준'은 인터뷰랑 조회수라는 한정된 성과를 문화 전반의 기준으로 확대해버린 과장된 표현이야. 나머지 두 표현은 인터뷰 횟수랑 조회수라는 구체적인 수치로 뒷받침되고 있고.",
+  wrongHint: "그 표현은 실제 인터뷰 진행이랑 조회수 수치처럼 확인 가능한 데이터야. 문화 전체의 기준이 됐다고 단정해버린 표현을 찾아봐."
+};
+
+const multiSelectData1 = {
+  sentence: "스텔라나인은 유럽 투어 5개 도시 전석을 판매 개시 10분 만에 매진시켰다. 이는 데뷔 2년 차 그룹으로는 이례적인 기록이다. 업계 관계자는 스텔라나인이 이미 전설의 반열에 올랐다고 평가했다. 한편 이번 유럽 투어 매출은 전년 대비 3배 증가했으며, 이 여세를 몰아 K-팝 역사를 새로 쓰고 있다는 분석도 나온다.",
+  options: [
+    {text:"유럽 투어 5개 도시 전석을 판매 개시 10분 만에 매진시켰다", exaggerated:false},
+    {text:"데뷔 2년 차 그룹으로는 이례적인 기록이다", exaggerated:false},
+    {text:"스텔라나인이 이미 전설의 반열에 올랐다는 평가", exaggerated:true},
+    {text:"이번 유럽 투어 매출은 전년 대비 3배 증가했다", exaggerated:false},
+    {text:"이 여세를 몰아 K-팝 역사를 새로 쓰고 있다는 분석", exaggerated:true}
+  ],
+  explain: "'전설의 반열에 올랐다'랑 'K-팝 역사를 새로 쓰고 있다', 이 둘은 이름도 밝히지 않은 '업계 관계자'나 '분석'에 기대서 실제 데이터로 확인되지 않는 지위를 단정해버린 과장된 표현이야. 나머지는 매진 시간·매출 증가율·비교 대상(데뷔 2년 차 그룹)이 다 명확하게 나온 진술이고.",
+  wrongHint: "정확히 과장된 표현 2개만 골라야 해. 구체적인 수치나 명확한 비교 기준이 있는 문장은 과장이 아니야."
+};
+
+const headlineBuildData1 = {
+  before: "스텔라나인, ",
+  slotCount: 2,
+  tiles: [
+    {text:"유럽 투어 전석 매진", correct:true},
+    {text:"판매 개시 10분 만에 매진", correct:true},
+    {text:"현지 매체서도 호평", correct:true},
+    {text:"글로벌 팝 아이콘 등극", correct:false},
+    {text:"유럽 전역 완전 정복", correct:false},
+    {text:"K-팝 역사 새로 쓰다", correct:false}
+  ],
+  explainGood: "데이터로 확인되는 조각들만 골라서 헤드라인을 완성했어! '매진', '호평'처럼 실제로 있었던 일은 자신 있게 써도 괜찮아. '아이콘 등극'이나 '역사를 새로 쓰다' 같은 조각은 근거 없이 부풀린 거였고.",
+  wrongHint: "그중 하나는 근거 없이 부풀려진 조각이야. 실제로 확인 가능한 사실만 골라봐."
+};
+
+/* ---------------- 대사 비트 헬퍼 ---------------- */
+const L = (speaker, text, emotion) => ({type:'line', speaker, text, emotion});
+const N = (text, portrait) => ({type:'line', speaker:'narration', text, portrait});
+const CARD = (tag, locKey, title, sub) => ({type:'chapterCard', tag, locKey, title, sub});
+const CHOICE = (prompt, opts) => ({type:'choice', prompt, opts});
+const MG = (kind, data) => ({type:'minigame', kind, data});
+const COND = (key, t, f) => ({type:'cond', key, t, f});
+const SET = (key, val) => ({type:'setFlag', key, val});
+const BG = (locKey) => ({type:'setBg', locKey});
+
+/* ---------------- 스토리 스크립트 ---------------- */
+const PROLOGUE_BEATS = [
+  CARD('PROLOGUE','meca','프롤로그','천사들의 세계, 메카'),
+  N('인간들은 알지 못하는 천사들의 세계, 메카.'),
+  N('메카의 천사들은 사회를 어지럽히는 악마들과 오랫동안 싸워왔다.', 'assets/mecha_angels_group.png'),
+  N('그러나 사람들이 SNS·틱톡·유튜브를 활발히 사용하기 시작하면서,\n정보를 조작해 사람들을 홀리는 악마 "페이크"의 힘이 걷잡을 수 없이 커져버렸다.'),
+  BG('busan'),
+  N('페이크를 물리치라는 명을 받고 인간계로 내려온 천사 아리엘.\n그러나 몇 번이고 맞서 싸웠지만 번번이 패배했고, 천사의 힘을 상징하는 두 날개를 모두 잃고 말았다.', 'assets/ariel_wings_breaking.png'),
+  N('그리고 지금, 거리 한켠에 누군가 다친 채 쓰러져 있다.', 'assets/ariel_wingless_downed.png'),
+  L('ariel','...으, 여긴...? 몸이 왜 이렇게...', 'downed'),
+  L('player','...저기요? 괜찮으세요?'),
+  N('{player}의 도움으로 정신을 차린 그녀는, 자신을 아리엘이라 소개했다.'),
+  L('ariel','고마워, {player}. 덕분에 살았어.\n나는 아리엘, 인간들은 모르는 천사들의 세계 "메카"에서 왔어.'),
+  L('ariel','페이크라는 악마와 싸우다가... 날개를 둘 다 잃어버렸어.\n날개가 없으면 나는 온전한 힘을 낼 수 없어.'),
+  L('ariel','{player}, 부탁이 있어. 나랑 같이 페이크를 막아줄 수 있을까?'),
+  CHOICE('{player}, 아리엘의 부탁을 들어줄까?', [
+    {label:'좋아요, 같이 싸울게요!', reply:L('ariel','고마워... 정말 다행이야. 혼자였다면 엄두도 못 냈을 거야.')},
+    {label:'음... 제가 도움이 될까요?', reply:L('ariel','괜찮아, 너무 어렵게 생각하지 마. 내가 하나씩 알려줄게.')}
+  ]),
+  L('ariel','페이크는 지금 너무 강해져서 정면으로 맞서면 승산이 없어.\n먼저 페이크에게 홀린 사람들부터 구해야 해.'),
+  L('ariel','붉은 눈으로 스마트폰이나 컴퓨터 화면만 들여다보고 있다면,\n그게 바로 홀린 사람이야.'),
+  N('거리 곳곳에서 사람들이 붉게 물든 눈으로 휴대폰 화면만 들여다보고 있다.\n표정 없이, 마치 홀린 듯이.', 'assets/enthralled_crowd.png'),
+  L('ariel','그 사람들을 구하다 보면, 내가 잃어버린 날개도 다시 찾을 수 있을 거야.\n가자, 첫 번째 장소로.')
+];
+
+const CH1_BEATS = [
+  CARD('CHAPTER 1 · 부산','busan','CHAPTER 1','지배자라는 이름'),
+  N('부산, 한 음악 블로거의 작업실.'),
+  L('kyle','이건 진짜 역사적인 순간이야!\n블레이즈문이 북미 시장의 새로운 지배자로 등극했다고!!'),
+  L('ariel','{player}, 저 눈빛 보이지? 붉게 빛나고 있어.\n완전히 기사에 홀렸다는 뜻이야.'),
+  L('ariel','화면 속 기사를 하나씩 같이 뜯어보자. 먼저 사실과 주장부터 구분해볼까.'),
+  L('ariel','기준은 간단해. 숫자·순위·기간처럼 누구나 확인할 수 있는 건 사실.\n거기에 "완전히", "전례없이" 같은 해석이나 비교가 얹히면 주장이야.'),
+  MG('fact', factDataBlaze),
+  L('ariel','하나 더 볼까. 숫자가 있다고 방심하면 안 돼.'),
+  MG('fact', factDataBlaze2),
+  L('ariel','비교하는 말이 나오면 항상 "무엇과 비교했는지"를 따져봐야 해.'),
+  MG('fact', factDataBlaze3),
+  L('ariel','좋아, 이번엔 이 기사의 주장을 뒷받침할 진짜 근거를 찾아보자.'),
+  L('ariel','좋은 근거의 기준은 하나야.\n주장하는 내용을 정황이 아니라 결과 그 자체로 직접 보여주는가.'),
+  MG('evidence', evidenceData2),
+  L('ariel',"근거 자체는 있어.\n문제는 그 근거가 '지배자'라는 표현을 감당할 수 있냐는 거지."),
+  MG('evidence', evidenceData2b),
+  L('ariel','사실 페이크도 원래는 이 정도로 힘이 세지 않았대.'),
+  L('ariel','그런데 "더 자극적으로, 더 크게"에 집착하면서\n작은 과장이 쌓이고 쌓여서, 지금처럼 힘이 커지고 사람들도 그렇게 홀리게 된 거더라.'),
+  L('ariel','과장을 찾는 기준도 똑같아.\n데이터가 뒷받침하는 범위보다 결론이 훨씬 커지면, 그게 과장이야.'),
+  MG('exaggerate', exaggerateData3),
+  L('ariel','하나 더 있어. 이번엔 투어 얘기를 다룬 기사야.'),
+  MG('exaggerate', exaggerateData3b),
+  SET('kyleFreed', true),
+  N('카일의 붉게 빛나던 눈이 서서히 원래 색으로 돌아온다.\n그는 멍한 표정으로 눈을 몇 번 깜빡이더니, 자신이 쓴 기사를 다시 들여다본다.'),
+  L('kyle',"어... '지배자'는 좀 과했나.\n3주 연속 차트에 든 것도 대단한 일인데, 왜 더 부풀리고 싶었을까."),
+  SET('wings', 1),
+  N('그 순간, 아리엘의 등 뒤에서 희미한 빛이 일렁이더니 한쪽 날개가 다시 모습을 드러낸다.'),
+  L('ariel','이건... 날개야! {player}, 날개가 돌아왔어!\n한쪽이지만... 확실히 힘이 느껴져.'),
+  L('fake','다음 목적지는... 이미 알고 있겠지? 거기선 그렇게 쉽지 않을 거야.'),
+  L('ariel','다음은 서울이야. 남은 날개 하나만 더 찾으면 돼. 가보자.')
+];
+
+const CH2_BEATS = [
+  CARD('CHAPTER 2 · 홍대','seoul','CHAPTER 2','아이콘이라는 착시'),
+  N('서울 홍대, 한 언론사 사무실. 인턴 기자 다은이 마감에 쫓기고 있다.'),
+  L('daeun',"제니스 기사... 30분 안에 넘겨야 하는데.\n'글로벌 팝 아이콘 등극'... 이 정도면 눈에 띄겠지."),
+  L('ariel','이번엔 조금 달라. 다은은 기사를 읽는 사람이 아니라 쓰는 사람이야.'),
+  L('ariel','먼저 이 기사에 담긴 문장부터 확인해보자.'),
+  MG('fact', factData3),
+  L('ariel','비슷해 보여도 다 같은 종류가 아니야. 하나 더 확인해보자.'),
+  MG('fact', factData3b),
+  L('ariel','하나만 더. 차트 얘기가 나오면 항상 개수와 기간을 확인해야 해.'),
+  MG('fact', factData3c),
+  L('ariel','그 다음, 이 문장을 뒷받침할 진짜 근거가 있는지 볼까.'),
+  MG('evidence', evidenceData3),
+  L('ariel','해외 반응을 다룬 문장도 하나 있어. 이것도 근거를 찾아보자.'),
+  MG('evidence', evidenceData3b),
+  L('ariel','마지막으로, 이 기사에서 가장 위험한 과장을 짚어보자.'),
+  MG('exaggerate', exaggerateData2),
+  L('ariel','시상식을 다룬 기사도 하나 더 있어. 같이 살펴보자.'),
+  MG('exaggerate', exaggerateData2b),
+  SET('daeunFreed', true),
+  N('다은의 붉게 빛나던 눈이 서서히 원래 색으로 돌아온다.\n그녀는 화들짝 놀라며 자신이 쓰고 있던 기사 초안을 다시 읽어본다.'),
+  L('daeun',"... '아이콘'이라는 말, 너무 쉽게 썼네.\n데이터는 충분히 좋은데, 왜 그걸로는 부족하다고 생각했을까."),
+  SET('wings', 2),
+  N('아리엘의 등 뒤에서 남은 한쪽 날개마저 빛을 내며 돌아온다.'),
+  L('ariel','...돌아왔어. 두 날개 다. {player} 덕분이야.\n이제 온전한 힘으로 페이크와 맞설 수 있어.', 'smiling'),
+  L('fake','그만! 다은은 내가 가장 공들인 작품이었는데...'),
+  L('fake','...흥, 날개를 다 되찾았다고 해서 달라질 건 없어.\n좋아. 그곳에서, 직접 상대해주지.'),
+  L('ariel','드디어 정체를 드러냈어. {player}, 마지막 싸움이야.\n이번엔 나도 함께 싸울 수 있어. 가자.', 'power')
+];
+
+const CH3_BEATS = [
+  CARD('CHAPTER 3 · 왜곡의 영역','final','CHAPTER 3','정화의 문장 (최종장)'),
+  N('현실과 데이터가 뒤섞인 공간.\n두 날개를 되찾은 아리엘과 {player}가 마침내 페이크 앞에 마주섰다.'),
+  L('fake',"여기까지 올 줄이야. 날개를 되찾았다고 기세등등하네.\n하지만 소용없어. 이번엔 내가 직접 썼거든.\n'스텔라나인, 글로벌 팝 아이콘 등극' — 어때, 완벽하지 않아?"),
+  L('fake','이건 어때? 네가 다 걸러낼 수 있을까?'),
+  L('ariel','본격적으로 시작하기 전에, 스텔라나인 관련 문장들부터 하나씩 짚어보자.', 'power'),
+  MG('fact', factDataStellar),
+  L('ariel','비슷한 문장을 하나 더 볼까.'),
+  MG('fact', factDataStellar2),
+  L('ariel','이 주장을 뒷받침할 진짜 근거도 찾아보자.'),
+  MG('evidence', evidenceDataStellar),
+  L('ariel','이번엔 과장된 표현을 직접 찾아볼까.'),
+  MG('exaggerate', exaggerateDataStellar),
+  L('ariel','인터뷰를 다룬 기사도 하나 더 있어.'),
+  MG('exaggerate', exaggerateDataStellar2),
+  L('ariel','한 문장이 아니라 문단 전체야.\n이번엔 과장된 표현을 하나도 빠짐없이 찾아야 해.', 'power'),
+  MG('multiselect', multiSelectData1),
+  L('ariel','좋아, 이제 마지막이야.'),
+  L('ariel','내 힘은 돌아왔지만, 이 마지막 헤드라인은 내가 대신 조립해줄 수 없어.\n{player}, 네가 직접 사실 조각들만 골라서 완성해야 해.', 'power'),
+  L('fake','흥, 어디 한번 해봐. 자극적인 조각들이 훨씬 더 그럴듯해 보일 텐데.'),
+  MG('headlinebuild', headlineBuildData1),
+  L('fake','...뭐? 데이터로만 완성된 헤드라인이라니.'),
+  L('ariel','완벽한 헤드라인이란 이런 거야.\n확인된 사실만으로도 충분히 흥미로운 이야기가 될 수 있어.', 'smiling'),
+  N('페이크의 형체가 흔들리기 시작한다...')
+];
+
+const ENDING_BEATS = [
+  CARD('ENDING','meca','완전한 정화','THE END'),
+  L('fake','...크윽... 이럴 수가. 내가, 이렇게 허무하게...', 'defeated'),
+  N('페이크의 형체가 빛 속으로 흩어진다.'),
+  L('ariel','해냈어, {player}! 두 날개도, 사람들의 마음도 모두 되찾았어.\n이제 사람들은 스스로 기사를 의심하고, 확인하는 법을 알게 될 거야.', 'smiling'),
+  N('메카로 돌아가는 길, 인간계 곳곳에서 사람들이 기사를 다시 한번 검색해보는 모습이 보인다.'),
+  L('ariel','자, 이제 메카로 돌아갈 시간이야. {player}, 정말 고마웠어.', 'divine'),
+  N('아리엘은 완전한 천사의 모습으로 돌아가, 환하게 웃으며 하늘 위로 날아오른다.')
+];
+
+/* ---------------- 엔진 상태 ---------------- */
+let playerName = '루';
+const state = {
+  score:0, total:0, freewriteClean:false, wings:0, kyleFreed:false, daeunFreed:false,
+  hearts:3, currentChapterIdx:0, chapterRetries:0
+};
+let currentLocGrad = LOCATIONS.meca;
+
+const screenEl = document.getElementById('screen');
+const tagSlot = document.getElementById('tagSlot');
+const heartsSlot = document.getElementById('heartsSlot');
+
+function T(text){ return text.split('{player}').join(playerName || '루').split('\n').join('<br>'); }
+function updateTag(text){ tagSlot.innerHTML = `<div class="chapter-tag">${text}</div>`; }
+
+function updateHearts(){
+  let html = '<div class="hearts-row">';
+  for(let i=0;i<3;i++){ html += i < state.hearts ? '<span class="heart-full">♥</span>' : '<span class="heart-empty">♥</span>'; }
+  html += '</div>';
+  heartsSlot.innerHTML = html;
+}
+function loseHeart(){
+  state.hearts = Math.max(0, state.hearts - 1);
+  updateHearts();
+  const row = heartsSlot.querySelector('.hearts-row');
+  if(row){ row.classList.add('pulse'); setTimeout(()=>row.classList.remove('pulse'), 400); }
+  screenEl.classList.add('crisis-flash');
+  setTimeout(()=>screenEl.classList.remove('crisis-flash'), 500);
+}
+
+/* 하트가 0이 되면 true를 반환 — 각 미니게임의 오답 분기에서 이 값을 확인해
+   true라면 정답 힌트를 보여주지 않고 즉시 페이크의 조롱 화면으로 넘어갑니다. */
+function heartsDepleted(){ return state.hearts <= 0; }
+
+const FAKE_TAUNTS = [
+  '흐흐... 벌써 정신이 홀렸나 보네. 다시 해봐, 어차피 안 될 거야.',
+  '그 정도 실력으로 날 막겠다고? 다시 도전해보시지.',
+  '이런, 하트가 다 떨어졌네. 처음부터 다시 해볼래?',
+  '역시 사람들은 쉽게 안 속아 넘어가지 않아. 한 번 더 해보시지.'
+];
+
+function showChapterFailScreen(){
+  state.chapterRetries++;
+  updateTag('FAIL');
+  screenEl.className = 'screen mode-world';
+  const taunt = FAKE_TAUNTS[Math.floor(Math.random()*FAKE_TAUNTS.length)];
+  screenEl.innerHTML = `
+    <div class="world-bg" style="background:${currentLocGrad}"></div>
+    <div class="portrait-wrap"><img class="portrait-img" src="${CAST.fake.img()}" alt="페이크"></div>
+    <div class="dialogue-box pixel-panel">
+      <div class="speaker-name" style="color:${CAST.fake.color}">${CAST.fake.name}</div>
+      <div class="dialogue-text">${taunt}</div>
+      <div class="choice-list">
+        <button class="story-choice-btn pixel-panel" id="retryChapterBtn">다시 도전하기</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('retryChapterBtn').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    // 다음 틱으로 미뤄서, 이 클릭 이벤트가 새로 그려질 화면까지 버블링되어
+    // 챕터 시작 비트를 건너뛰는 일이 없도록 합니다.
+    setTimeout(()=> runChapter(state.currentChapterIdx), 0);
+  }, {once:true});
+}
+
+/* ---------------- 시퀀스 러너 ---------------- */
+function playSequence(beats, onAllDone){
+  let i = 0;
+  function step(){
+    if(i>=beats.length){ onAllDone(); return; }
+    const beat = beats[i]; i++;
+    runBeat(beat, step);
+  }
+  step();
+}
+
+function runBeat(beat, next){
+  switch(beat.type){
+    case 'chapterCard': renderChapterCard(beat, next); break;
+    case 'line': renderLine(beat, next); break;
+    case 'choice': renderChoiceBeat(beat, next); break;
+    case 'minigame': renderMinigame(beat, next); break;
+    case 'cond': runBeat(state[beat.key] ? beat.t : beat.f, next); break;
+    case 'setFlag': state[beat.key] = beat.val; next(); break;
+    case 'setBg': currentLocGrad = LOCATIONS[beat.locKey] || currentLocGrad; next(); break;
+    default: next();
+  }
+}
+
+/* ---------------- 월드(대사) 렌더러 ---------------- */
+function renderChapterCard(beat, next){
+  currentLocGrad = LOCATIONS[beat.locKey] || currentLocGrad;
+  updateTag(beat.tag);
+  screenEl.className = 'screen mode-world';
+  screenEl.innerHTML = `
+    <div class="world-bg" style="background:${currentLocGrad}"></div>
+    <div class="chapter-card">
+      <div class="chapter-card-inner pixel-panel">
+        <div class="chapter-card-title">${beat.title}</div>
+        <div class="chapter-card-sub">${beat.sub}</div>
+      </div>
+      <div class="advance-hint" style="text-align:center;">클릭해서 계속 ▶</div>
+    </div>
+  `;
+  screenEl.addEventListener('click', ()=>next(), {once:true});
+}
+
+function renderLine(beat, next){
+  screenEl.className = 'screen mode-world';
+  const cast = CAST[beat.speaker] || CAST.narration;
+  const isNarration = beat.speaker === 'narration';
+  const isPlayer = beat.speaker === 'player';
+  const name = isPlayer ? (playerName || '루') : cast.name;
+  const imgSrc = beat.portrait ? beat.portrait : (cast.img ? cast.img(beat.emotion) : null);
+  screenEl.innerHTML = `
+    <div class="world-bg" style="background:${currentLocGrad}"></div>
+    <div class="portrait-wrap">${imgSrc ? `<img class="portrait-img" src="${imgSrc}" alt="${name||''}">` : ''}</div>
+    <div class="dialogue-box pixel-panel ${isNarration?'narration-box':''}">
+      ${!isNarration ? `<div class="speaker-name" style="color:${cast.color}">${name}</div>` : ''}
+      <div class="dialogue-text">${T(beat.text)}</div>
+      <div class="advance-hint">▼ 클릭해서 계속</div>
+    </div>
+  `;
+  screenEl.addEventListener('click', ()=>next(), {once:true});
+}
+
+function renderChoiceBeat(beat, next){
+  screenEl.className = 'screen mode-world';
+  const imgSrc = CAST.ariel.img(null);
+  screenEl.innerHTML = `
+    <div class="world-bg" style="background:${currentLocGrad}"></div>
+    <div class="portrait-wrap"><img class="portrait-img" src="${imgSrc}" alt="아리엘"></div>
+    <div class="dialogue-box pixel-panel">
+      <div class="speaker-name" style="color:${CAST.ariel.color}">${CAST.ariel.name}</div>
+      <div class="dialogue-text">${T(beat.prompt)}</div>
+      <div class="choice-list">
+        ${beat.opts.map((o,i)=>`<button class="story-choice-btn pixel-panel" data-i="${i}">${T(o.label)}</button>`).join('')}
+      </div>
+    </div>
+  `;
+  document.querySelectorAll('.story-choice-btn').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const idx = Number(btn.dataset.i);
+      runBeat(beat.opts[idx].reply, next);
+    }, {once:true});
+  });
+}
+
+/* ---------------- 미니게임 렌더러 ---------------- */
+function renderMinigame(beat, next){
+  screenEl.className = 'screen';
+  if(beat.kind==='fact') renderFactClaim(beat.data, next);
+  else if(beat.kind==='evidence') renderEvidenceDrag(beat.data, next);
+  else if(beat.kind==='exaggerate') renderExaggerate(beat.data, next);
+  else if(beat.kind==='multiselect') renderMultiSelect(beat.data, next);
+  else if(beat.kind==='headlinebuild') renderHeadlineBuild(beat.data, next);
+}
+
+function pageChrome(innerHtml, urlSlug){
+  return `
+    <div class="browser-frame">
+      <div class="browser-bar">
+        <span class="browser-dot red"></span><span class="browser-dot yellow"></span><span class="browser-dot green"></span>
+        <div class="browser-url">weeklyculture.example/${urlSlug || 'article'}</div>
+      </div>
+      <div class="site-masthead">
+        <div class="site-logo">위클리컬처</div>
+        <div class="site-nav">음악<span>·</span>화보<span>·</span>차트<span>·</span>인터뷰</div>
+      </div>
+      <div class="article-app">${innerHtml}</div>
+      <div class="site-footer">© 위클리컬처 · 무단전재 및 재배포 금지</div>
+    </div>
+  `;
+}
+
+function fakeSays(text){
+  return `<div class="speech-box fake"><div class="speaker-chip fake">페이크</div><div class="speech-text">${text}</div></div>`;
+}
+
+function showNav(onDone, label){
+  const nav = document.getElementById('nav');
+  nav.innerHTML = `<button class="btn btn-ghost" id="nextBtn">${label || '다음 →'}</button>`;
+  document.getElementById('nextBtn').addEventListener('click', onDone, {once:true});
+}
+
+function renderFactClaim(d, onDone){
+  screenEl.innerHTML = `
+    <div class="stage-header">사실 vs 주장</div>
+    ${pageChrome(`
+      <div class="src">위클리 컬처 · 방금 전</div>
+      <p class="body">${d.before||''}<mark class="highlight">${d.highlight}</mark>${d.after||''}</p>
+    `, 'fact-or-claim')}
+    ${fakeSays('이 정도면 완벽한 <b>사실</b> 같지 않아? 아니면 이것도 내가 심어둔 <b>주장·해석</b>일까? 한번 골라봐.')}
+    <div class="choice-row">
+      <button class="choice-btn" data-c="fact">사실</button>
+      <button class="choice-btn" data-c="claim">주장 및 해석</button>
+    </div>
+    <div class="feedback" id="fb"></div>
+    <div class="footer-nav" id="nav"></div>
+  `;
+  document.querySelectorAll('.choice-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const choice = btn.dataset.c;
+      document.querySelectorAll('.choice-btn').forEach(b=>b.disabled=true);
+      const correct = choice === d.answer;
+      state.total++;
+      if(correct){
+        state.score++; btn.classList.add('correct');
+      }else{
+        btn.classList.add('wrong');
+        document.querySelector(`.choice-btn[data-c="${d.answer}"]`).classList.add('correct');
+        loseHeart();
+        if(heartsDepleted()){ showChapterFailScreen(); return; }
+      }
+      const fb = document.getElementById('fb');
+      fb.className = 'feedback show ' + (correct?'ok':'bad');
+      fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">${(correct? '정답이야! ' : '다시 살펴볼까? ') + d.explain}</div>`;
+      showNav(onDone);
+    });
+  });
+}
+
+function renderEvidenceDrag(d, onDone){
+  let solved = false, tries = 0, totalCounted = false;
+  screenEl.innerHTML = `
+    <div class="stage-header">근거자료 채우기</div>
+    ${pageChrome(`
+      <div class="src">위클리 컬처 · 방금 전</div>
+      <p class="headline">${d.headline}</p>
+      <p class="body">이를 뒷받침하는 근거자료는 <span class="blank-slot" id="blankSlot">근거 자료 필요</span> 입니다.</p>
+    `, 'evidence')}
+    ${fakeSays('말로만 떠들어봤자 안 믿기지? 이 주장을 뒷받침할 진짜 근거를 — 있다면 말이야 — 아래에서 골라 담아봐.')}
+    <div class="candidates" id="candList">
+      ${d.candidates.map((c,i)=>`<div class="candidate" data-i="${i}" draggable="true">${c}</div>`).join('')}
+    </div>
+    <div class="feedback" id="fb"></div>
+    <div class="footer-nav" id="nav"></div>
+  `;
+  const slot = document.getElementById('blankSlot');
+  slot.addEventListener('dragover', e=>e.preventDefault());
+  slot.addEventListener('drop', e=>{ e.preventDefault(); attempt(Number(e.dataTransfer.getData('text/plain'))); });
+  document.querySelectorAll('.candidate').forEach(card=>{
+    card.addEventListener('dragstart', e=> e.dataTransfer.setData('text/plain', card.dataset.i));
+    card.addEventListener('click', ()=>{ if(!solved) attempt(Number(card.dataset.i)); });
+  });
+  function attempt(i){
+    if(solved) return;
+    const card = document.querySelector(`.candidate[data-i="${i}"]`);
+    const fb = document.getElementById('fb');
+    if(i === d.correct){
+      solved = true;
+      slot.textContent = d.candidates[i];
+      slot.classList.add('filled');
+      document.querySelectorAll('.candidate').forEach(c=>c.classList.add('used'));
+      if(!totalCounted){ state.total++; totalCounted = true; }
+      state.score++;
+      fb.className = 'feedback show ok';
+      fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">${'정확한 근거자료를 찾았어! ' + d.explain}</div>`;
+      showNav(onDone);
+    }else{
+      tries++;
+      if(!totalCounted){ state.total++; totalCounted = true; }
+      loseHeart();
+      if(heartsDepleted()){ showChapterFailScreen(); return; }
+      card.classList.add('wrong-flash');
+      screenEl.classList.add('shake');
+      setTimeout(()=>{ card.classList.remove('wrong-flash'); screenEl.classList.remove('shake'); }, 350);
+      fb.className = 'feedback show bad';
+      fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">이 자료는 기사의 주장이랑 직접 연결되지 않아. 다른 자료를 골라볼래?</div>`;
+    }
+  }
+}
+
+function renderExaggerate(d, onDone){
+  let solved = false;
+  screenEl.innerHTML = `
+    <div class="stage-header">과장된 표현 찾기</div>
+    ${pageChrome(`
+      <div class="src">위클리 컬처 · 방금 전</div>
+      <p class="body" id="sentenceArea">
+        ${d.spans.map((s,i)=> s.clickable
+            ? `<span class="clickable-phrase" data-i="${i}">${s.text}</span>`
+            : `<span>${s.text}</span>`).join('')}
+      </p>
+    `, 'exaggeration')}
+    ${fakeSays('밑줄 친 표현들, 다 그럴싸하지? 그중 딱 하나, 내가 몰래 부풀려 넣은 <b>과장된 표현</b>을 찾아내 봐.')}
+    <div class="feedback" id="fb"></div>
+    <div class="footer-nav" id="nav"></div>
+  `;
+  document.querySelectorAll('.clickable-phrase').forEach(span=>{
+    span.addEventListener('click', ()=>{
+      if(solved) return;
+      const i = Number(span.dataset.i);
+      const isCorrect = d.spans[i].correct;
+      const fb = document.getElementById('fb');
+      if(isCorrect){
+        solved = true;
+        state.total++; state.score++;
+        document.getElementById('sentenceArea').innerHTML = `<span class="clickable-phrase corrected">${d.corrected}</span>`;
+        fb.className = 'feedback show ok';
+        fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">${'좋아, 정화 완료! ' + d.explain}</div>`;
+        showNav(onDone);
+      }else{
+        loseHeart();
+        if(heartsDepleted()){ showChapterFailScreen(); return; }
+        screenEl.classList.add('shake');
+        setTimeout(()=>screenEl.classList.remove('shake'), 350);
+        fb.className = 'feedback show bad';
+        fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">${d.wrongHint}</div>`;
+      }
+    });
+  });
+}
+
+function renderHeadlineBuild(d, onDone){
+  const picked = [];
+  screenEl.innerHTML = `
+    <div class="stage-header">헤드라인 조립하기</div>
+    ${pageChrome(`
+      <div class="src">위클리 컬처 · 방금 전</div>
+      <p class="headline">${d.before}<span class="blank-slot" id="slotPreview">헤드라인 조각을 선택하세요</span></p>
+    `, 'headline-build')}
+    ${fakeSays('어디 한번 조립해봐. 진짜 데이터로만 헤드라인을 완성할 수 있을 것 같아?')}
+    <div class="prompt-note">정확히 ${d.slotCount}개의 조각을 골라 헤드라인을 완성하세요.</div>
+    <div class="msoptions" id="tileList">
+      ${d.tiles.map((t,i)=>`<div class="msoption" data-i="${i}"><span class="box"></span><span>${t.text}</span></div>`).join('')}
+    </div>
+    <button class="btn btn-primary" id="buildSubmitBtn" disabled>완성하기</button>
+    <div class="feedback" id="fb"></div>
+    <div class="footer-nav" id="nav"></div>
+  `;
+  const submitBtn = document.getElementById('buildSubmitBtn');
+  const slotPreview = document.getElementById('slotPreview');
+  function updatePreview(){
+    if(picked.length===0){
+      slotPreview.textContent = '헤드라인 조각을 선택하세요';
+      slotPreview.classList.remove('filled');
+    }else{
+      slotPreview.textContent = picked.map(i=>d.tiles[i].text).join(' · ');
+      slotPreview.classList.toggle('filled', picked.length===d.slotCount);
+    }
+    submitBtn.disabled = picked.length !== d.slotCount;
+  }
+  document.querySelectorAll('#tileList .msoption').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const i = Number(el.dataset.i);
+      const at = picked.indexOf(i);
+      if(at>=0){
+        picked.splice(at,1);
+        el.classList.remove('picked');
+        el.querySelector('.box').textContent='';
+        document.querySelectorAll('#tileList .msoption.picked').forEach((p,idx)=> p.querySelector('.box').textContent = String(idx+1));
+      }else{
+        if(picked.length>=d.slotCount){
+          screenEl.classList.add('shake'); setTimeout(()=>screenEl.classList.remove('shake'),350);
+          return;
+        }
+        picked.push(i);
+        el.classList.add('picked');
+        el.querySelector('.box').textContent = String(picked.length);
+      }
+      updatePreview();
+    });
+  });
+  submitBtn.addEventListener('click', ()=>{
+    if(picked.length!==d.slotCount) return;
+    const allCorrect = picked.every(i=>d.tiles[i].correct);
+    state.total++;
+    const fb = document.getElementById('fb');
+    if(allCorrect){
+      state.score++;
+      state.freewriteClean = true;
+      submitBtn.disabled = true;
+      document.querySelectorAll('#tileList .msoption').forEach(el=>el.style.pointerEvents='none');
+      fb.className = 'feedback show ok';
+      fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">${d.explainGood}</div>`;
+      showNav(onDone, '계속하기 →');
+    }else{
+      loseHeart();
+      if(heartsDepleted()){ showChapterFailScreen(); return; }
+      screenEl.classList.add('shake'); setTimeout(()=>screenEl.classList.remove('shake'),350);
+      fb.className = 'feedback show bad';
+      fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">${d.wrongHint}</div>`;
+      picked.length = 0;
+      document.querySelectorAll('#tileList .msoption').forEach(el=>{ el.classList.remove('picked'); el.querySelector('.box').textContent=''; });
+      updatePreview();
+    }
+  });
+}
+
+function renderMultiSelect(d, onDone){
+  let solved = false;
+  const picked = new Set();
+  screenEl.innerHTML = `
+    <div class="stage-header">과장된 표현 모두 찾기</div>
+    ${pageChrome(`
+      <div class="src">위클리 컬처 · 방금 전</div>
+      <p class="body">${d.sentence}</p>
+    `, 'full-exposure')}
+    ${fakeSays('이번엔 하나가 아니야. 문단 전체에 숨겨둔 <b>과장된 표현</b>을 정확히 모두 찾아내지 못하면 소용없어. (몇 개인지는 알려주지 않을 거야)')}
+    <div class="msoptions" id="msList">
+      ${d.options.map((o,i)=>`<div class="msoption" data-i="${i}"><span class="box"></span><span>${o.text}</span></div>`).join('')}
+    </div>
+    <button class="btn btn-primary" id="msSubmitBtn">선택 완료</button>
+    <div class="feedback" id="fb"></div>
+    <div class="footer-nav" id="nav"></div>
+  `;
+  document.querySelectorAll('.msoption').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      if(solved) return;
+      const i = Number(el.dataset.i);
+      if(picked.has(i)){ picked.delete(i); el.classList.remove('picked'); el.querySelector('.box').textContent=''; }
+      else{ picked.add(i); el.classList.add('picked'); el.querySelector('.box').textContent='✓'; }
+    });
+  });
+  document.getElementById('msSubmitBtn').addEventListener('click', ()=>{
+    if(solved) return;
+    const correctSet = new Set(d.options.map((o,i)=> o.exaggerated ? i : null).filter(v=>v!==null));
+    const same = picked.size===correctSet.size && [...picked].every(i=>correctSet.has(i));
+    const fb = document.getElementById('fb');
+    if(same){
+      solved = true;
+      state.total++; state.score++;
+      document.getElementById('msSubmitBtn').disabled = true;
+      document.querySelectorAll('.msoption').forEach(el=>{
+        const i = Number(el.dataset.i);
+        if(correctSet.has(i)) el.style.borderColor = '#4ec48c';
+      });
+      fb.className = 'feedback show ok';
+      fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">${'정확히 찾아냈어! ' + d.explain}</div>`;
+      showNav(onDone);
+    }else{
+      loseHeart();
+      if(heartsDepleted()){ showChapterFailScreen(); return; }
+      screenEl.classList.add('shake');
+      setTimeout(()=>screenEl.classList.remove('shake'), 350);
+      fb.className = 'feedback show bad';
+      fb.innerHTML = `<div class="speaker-chip ariel">아리엘</div><div class="speech-text">${d.wrongHint}</div>`;
+    }
+  });
+}
+
+/* ---------------- 타이틀 & 엔딩 ---------------- */
+function renderTitle(){
+  currentLocGrad = LOCATIONS.final;
+  updateTag('TITLE');
+  heartsSlot.innerHTML = '';
+  screenEl.className = 'screen mode-world';
+  screenEl.innerHTML = `
+    <div class="world-bg" style="background:${currentLocGrad}"></div>
+    <div class="title-card">
+      <div class="title-heading">메타의 지령: 페이크를 물리쳐라</div>
+      <div class="title-sub">악마의 기사를 막아라 — 메카 에디션</div>
+      <input id="nameInput" class="name-input" placeholder="당신의 이름 (기본: 루)" maxlength="6" />
+      <button class="btn btn-primary" id="titleStartBtn">여정 시작하기</button>
+      <div class="credit-line">언론진흥재단의 지원을 받아 제작되었습니다.</div>
+    </div>
+  `;
+  document.getElementById('titleStartBtn').addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const val = document.getElementById('nameInput').value.trim();
+    playerName = val || '루';
+    state.score = 0; state.total = 0; state.freewriteClean = false;
+    state.wings = 0; state.kyleFreed = false; state.daeunFreed = false;
+    state.hearts = 3; state.currentChapterIdx = 0; state.chapterRetries = 0;
+    updateHearts();
+    setTimeout(startStory, 0);
+  });
+}
+
+function renderFinalScreen(){
+  updateTag('EPILOGUE');
+  screenEl.className = 'screen';
+  screenEl.innerHTML = `
+    <div class="intro-title">완전한 정화</div>
+    <div class="score-badge">${state.score} / ${state.total}</div>
+    <div class="score-sub">정확히 판별한 문장·근거·표현의 수</div>
+    ${state.chapterRetries>0 ? `<div class="score-sub">페이크에게 ${state.chapterRetries}번 재도전한 끝에 얻은 승리예요!</div>` : ''}
+    <div class="tip-box">
+      <b>오늘의 팩트체크 원칙</b><br>
+      ① 수치·차트·날짜처럼 확인 가능한 것만 사실이다.<br>
+      ② '대성공', '장악', '등극', '정복' 같은 단정적 표현은 근거를 의심하자.<br>
+      ③ 주장에는 반드시 실제 데이터·출처가 뒷받침되어야 한다.<br>
+      ④ 기사를 볼 때 표현과 데이터가 실제로 맞는지 늘 매칭해보자.
+    </div>
+    <div class="footer-nav">
+      <button class="btn btn-primary" id="restartBtn">처음부터 다시하기</button>
+    </div>
+    <div class="credit-line">언론진흥재단의 지원을 받아 제작되었습니다.</div>
+  `;
+  document.getElementById('restartBtn').addEventListener('click', renderTitle);
+}
+
+const CHAPTERS = [CH1_BEATS, CH2_BEATS, CH3_BEATS];
+
+function runChapter(idx){
+  state.currentChapterIdx = idx;
+  state.hearts = 3;
+  updateHearts();
+  playSequence(CHAPTERS[idx], ()=>{
+    if(idx + 1 < CHAPTERS.length){
+      runChapter(idx + 1);
+    }else{
+      playSequence(ENDING_BEATS, renderFinalScreen);
+    }
+  });
+}
+
+function startStory(){
+  playSequence(PROLOGUE_BEATS, ()=> runChapter(0));
+}
+
+/* ---------------- 시작 ---------------- */
+renderTitle();
+</script>
+</body>
+</html>
